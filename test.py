@@ -10,21 +10,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-from models.model_CNN import SimpleCNN
-#from train import NUM_CLASSES   # Uses your existing constant
+import trained_model
 
-NUM_CLASSES = 2
+NUM_CLASSES = 2   # only used if MODEL_PATH is a legacy bare state_dict
 MODEL_PATH = "simple_cnn_model.pth"
 EVAL_DIR = "Test_Data"       # <-- folder containing class subfolders
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def load_model():
-    model = SimpleCNN(num_classes=NUM_CLASSES)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-    model.to(device)
-    model.eval()
-    return model
+    return trained_model.load(MODEL_PATH, device=device, arch="SimpleCNN", num_classes=NUM_CLASSES).model
 
 def get_dataloader():
     dataset = PreprocessedImageDataset(EVAL_DIR)

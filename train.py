@@ -5,10 +5,17 @@ from models.model_CNN import SimpleCNN
 from models.complex_CNN import ASLNet
 from models.SVM import SVMClassifier
 from training import train, evaluate
+import os
+import trained_model
 
 DATA_DIR = "data"
 BATCH_SIZE = 32
-NUM_CLASSES = 2
+MODEL_PATH = "simple_cnn_model_3.pth"
+PREPROCESS_METHOD = "yolo"   # what dataset.py applies; stored in the checkpoint
+
+# class order matches dataset.py (sorted folder names)
+CLASS_NAMES = sorted(d for d in os.listdir(DATA_DIR) if os.path.isdir(os.path.join(DATA_DIR, d))) if os.path.isdir(DATA_DIR) else []
+NUM_CLASSES = len(CLASS_NAMES) or 2
 
 def main():
     # load full dataset
@@ -32,7 +39,8 @@ def main():
 
     model = SimpleCNN(num_classes=NUM_CLASSES)
     train(model, train_loader, epochs=10, lr=1e-3)
-    torch.save(model.state_dict(), "simple_cnn_model_3.pth")
+    trained_model.save(MODEL_PATH, model, "SimpleCNN", class_names=CLASS_NAMES or None,
+                       num_classes=NUM_CLASSES, preprocess_method=PREPROCESS_METHOD)
     print("model saved")
     print("Model_CNN Evaluation")
     print(evaluate(model, val_loader))
@@ -42,7 +50,7 @@ def main():
     
     '''model = ASLNet(num_classes= NUM_CLASSES)
     train(model, train_loader, epochs=10, lr=1e-3)
-    torch.save(model.state_dict(), "cnn_model.pth")
+    trained_model.save("cnn_model.pth", model, "ASLNet", class_names=CLASS_NAMES or None, num_classes=NUM_CLASSES, preprocess_method=PREPROCESS_METHOD)
     print("model saved")
     print("Model_ASL Evaluation")
     print(evaluate(model, val_loader))'''
