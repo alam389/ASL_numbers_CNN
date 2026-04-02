@@ -1,12 +1,7 @@
 import os
-import numpy as np
-import torch
 from torch.utils.data import Dataset
 import cv2
-from visionPreprocess import preprocess_live, preprocess_with_yolo
-from ultralytics import YOLO
-
-yolo = YOLO("yolov8n.pt")
+from visionPreprocess import crop_hand
 
 class PreprocessedImageDataset(Dataset):
     def __init__(self, root_dir):
@@ -27,18 +22,8 @@ class PreprocessedImageDataset(Dataset):
 
         img = cv2.imread(img_path)
 
-        '''
-        # Use live preprocessing for training
-        processed, _ , _1 = preprocess_live(img)
-        processed = np.array(processed)
-        # Ensure shape is (1, H, W)
-        if processed.ndim == 2:
-            processed = processed.reshape(1, processed.shape[0], processed.shape[1])
-        img_tensor = torch.tensor(processed, dtype=torch.float32)
-        '''
-
-        img_tensor = preprocess_with_yolo(img, yolo)
-        if img_tensor is None:
+        crop = crop_hand(img, method="yolo")
+        if crop is None:
             return self.__getitem__((idx + 1) % len(self))
 
-        return img_tensor, label
+        return crop.tensor, label

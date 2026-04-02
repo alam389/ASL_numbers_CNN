@@ -12,18 +12,16 @@ import seaborn as sns
 
 import trained_model
 
-NUM_CLASSES = 2   # only used if MODEL_PATH is a legacy bare state_dict
-MODEL_PATH = "simple_cnn_model.pth"
-EVAL_DIR = "Test_Data"       # <-- folder containing class subfolders
+from settings import MODEL_PATH, EVAL_DIR, EVAL_BATCH_SIZE, LEGACY_ARCH, LEGACY_NUM_CLASSES
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def load_model():
-    return trained_model.load(MODEL_PATH, device=device, arch="SimpleCNN", num_classes=NUM_CLASSES).model
+    return trained_model.load(MODEL_PATH, device=device, arch=LEGACY_ARCH, num_classes=LEGACY_NUM_CLASSES).model
 
 def get_dataloader():
     dataset = PreprocessedImageDataset(EVAL_DIR)
-    loader = DataLoader(dataset, batch_size=32, shuffle=False)
+    loader = DataLoader(dataset, batch_size=EVAL_BATCH_SIZE, shuffle=False)
 
     # Class names come from folder names
     class_names = sorted(os.listdir(EVAL_DIR))

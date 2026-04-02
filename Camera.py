@@ -3,18 +3,16 @@ import torch
 import torchvision.transforms as transforms
 from models.model_CNN import SimpleCNN
 from models.complex_CNN import ASLNet
-from visionPreprocess import preprocess_live
+from visionPreprocess import crop_hand
+import trained_model
 
-NUM_CLASSES = 10
-MODEL_PATH = "cnn_model.pth"
+from settings import MODEL_PATH, LEGACY_ARCH, LEGACY_NUM_CLASSES, ROI_SIZE, QUIT_KEY, JETSON_CAMERA
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #Load Model
-model = SimpleCNN(num_classes=NUM_CLASSES)
-model.load_state_dict(torch.load(MODEL_PATH))
-model.to(device)
-model.eval()
+# LEGACY_* are only used if MODEL_PATH is a legacy bare state_dict
+trained = trained_model.load(MODEL_PATH, device=device, arch=LEGACY_ARCH, num_classes=LEGACY_NUM_CLASSES)
 
 def gstreamer_pipeline(
     sensor_id=0,
@@ -45,7 +43,7 @@ def gstreamer_pipeline(
     )
 def main():
 
-    cap = cv2.VideoCapture(gstreamer_pipeline(), cv2.CAP_GSTREAMER)
+    cap = cv2.VideoCapture(gstreamer_pipeline(**JETSON_CAMERA), cv2.CAP_GSTREAMER)
 
 
     print("Camera opened:", cap.isOpened())
@@ -64,7 +62,7 @@ def main():
             H, W, _ = frame.shape
 
             # Define a centered 400×400 ROI
-            roi_size = 400
+            roi_size = ROI_SIZE
             x1 = W//2 - roi_size//2
             y1 = H//2 - roi_size//2
             x2 = x1 + roi_size
@@ -73,13 +71,17 @@ def main():
             roi = frame[y1:y2, x1:x2]
             
             #processed, bbox = preprocess_live(roi)
-            processed, bbox = preprocess_live(frame)
+            crop = crop_hand(frame, method="skin")
+            if crop is None:
+                cv2.imshow("Camera", frame)
+                if cv2.waitKey(1) & 0xFF == QUIT_KEY:
+                    break
+                continue
+            processed, bbox = crop.tensor.numpy(), crop.bbox
 
-            tensor = torch.from_numpy(processed).float().unsqueeze(0).to(device)
+            tensor = crop.tensor.float().unsqueeze(0).to(device)
  
-            with torch.no_grad():
-                output = model(tensor)
-                pred = torch.argmax(output, dim=1).item()
+            pred = trained.predict(tensor).item()
 
             cv2.putText(frame, f"Prediction: {pred}", (30, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
@@ -96,7 +98,7 @@ def main():
 
             cv2.imshow("Camera", frame)
             print(f"Prediction: {pred}")
-            if cv2.waitKey(1) & 0xFF == 27:
+            if cv2.waitKey(1) & 0xFF == QUIT_KEY:
                 break
 
     finally:

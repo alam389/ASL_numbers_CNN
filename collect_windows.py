@@ -1,9 +1,9 @@
 import cv2
 import os
 from datetime import datetime
-from visionPreprocess import preprocess_live  # your preprocessing function
+from visionPreprocess import crop_hand
 
-DATA_DIR = "my_dataset_processed"
+from settings import COLLECT_DIR as DATA_DIR, WEBCAM_INDEX
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Create class folders 0–9
@@ -12,7 +12,7 @@ for i in range(10):
 
 # --- Windows webcam capture ---
 # CAP_DSHOW avoids long startup delays on Windows
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(WEBCAM_INDEX, cv2.CAP_DSHOW)
 
 if not cap.isOpened():
     print("ERROR: Could not open camera")
@@ -28,13 +28,15 @@ while True:
         break
 
     # Apply your preprocessing
-    processed, bbox, _ = preprocess_live(frame, size=(128, 128), training=True)
+    crop = crop_hand(frame, method="skin")
+    processed = crop.image if crop is not None else None
 
     # Show raw camera feed
     cv2.imshow("Camera", frame)
 
     # Show processed crop
-    cv2.imshow("Processed", processed[0] * 255)
+    if processed is not None:
+        cv2.imshow("Processed", processed)
 
     key = cv2.waitKey(1) & 0xFF
 

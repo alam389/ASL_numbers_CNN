@@ -1,9 +1,9 @@
 import cv2
 import os
 from datetime import datetime
-from visionPreprocess import preprocess_live  # <-- your preprocessing
+from visionPreprocess import crop_hand
 
-DATA_DIR = "my_dataset_processed"  # folder to save processed images
+from settings import COLLECT_DIR as DATA_DIR, JETSON_CAMERA
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
@@ -40,7 +40,7 @@ for i in range(10):
     os.makedirs(os.path.join(DATA_DIR, str(i)), exist_ok=True)
 
 # Open webcam (force V4L2 backend for Linux)
-pipeline = gstreamer_pipeline()
+pipeline = gstreamer_pipeline(**JETSON_CAMERA)
 cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
 
 
@@ -58,13 +58,15 @@ while True:
         break
 
     # --- Apply your preprocessing ---
-    processed, bbox = preprocess_live(frame, size=(128,128), training=True)
+    crop = crop_hand(frame, method="skin")
+    processed = crop.image if crop is not None else None
 
     # Show raw camera feed
     cv2.imshow("Camera", frame)
 
     # Show processed crop
-    cv2.imshow("Processed", processed[0] * 255)
+    if processed is not None:
+        cv2.imshow("Processed", processed)
 
     key = cv2.waitKey(1) & 0xFF
 
@@ -81,8 +83,10 @@ while True:
         filepath = os.path.join(folder, filename)
 
         # Save processed image (scaled back to 0–255)
-        save_img = (processed[0] * 255).astype("uint8")
-        cv2.imwrite(filepath, save_img)
+        if processed is None:
+            print("No hand detected; nothing saved")
+            continue
+        cv2.imwrite(filepath, processed)
 
         print(f"Saved {filepath}")
 

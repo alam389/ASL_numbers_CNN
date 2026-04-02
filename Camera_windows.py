@@ -3,26 +3,20 @@ import torch
 import torchvision.transforms as transforms
 from models.model_CNN import SimpleCNN
 from models.complex_CNN import ASLNet
-from visionPreprocess import preprocess_live, preprocess_with_yolo
-from ultralytics import YOLO
-from train import NUM_CLASSES
+from visionPreprocess import crop_hand
+import trained_model
 
-#NUM_CLASSES = 10
-MODEL_PATH = "simple_cnn_model.pth"
-yolo = YOLO("yolov8n.pt")
+from settings import MODEL_PATH, LEGACY_ARCH, LEGACY_NUM_CLASSES, ROI_SIZE, QUIT_KEY, WEBCAM_INDEX
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load Model
-model = SimpleCNN(num_classes=NUM_CLASSES)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-model.to(device)
-model.eval()
+trained = trained_model.load(MODEL_PATH, device=device, arch=LEGACY_ARCH, num_classes=LEGACY_NUM_CLASSES)
 
 def main():
 
     # --- USE NORMAL WEBCAM ---
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(WEBCAM_INDEX)
 
     print("Camera opened:", cap.isOpened())
     if not cap.isOpened():
@@ -40,7 +34,7 @@ def main():
             H, W, _ = frame.shape
 
             # Define centered 400×400 ROI
-            roi_size = 400
+            roi_size = ROI_SIZE
             x1 = W//2 - roi_size//2
             y1 = H//2 - roi_size//2
             x2 = x1 + roi_size
@@ -49,21 +43,14 @@ def main():
             roi = frame[y1:y2, x1:x2]
 
             # Process the ROI (or full frame depending on your pipeline)
-            live, bbox, hand_region = preprocess_live(roi)
-            # tensor = torch.from_numpy(processed).float().unsqueeze(0).to(device)
-
-            tensor =  preprocess_with_yolo(roi, yolo)    
-
-            if tensor is not None:
-                tensor = tensor.unsqueeze(0).to(device)   # <--- ADD THIS
-            else:
+            crop = crop_hand(roi, method="yolo")
+            if crop is None:
                 continue
-            bbox = None
-            hand_region = None 
+            tensor = crop.tensor.unsqueeze(0).to(device)
+            bbox = crop.bbox
+            hand_region = crop.image
 
-            with torch.no_grad():
-                output = model(tensor)
-                pred = torch.argmax(output, dim=1).item()
+            pred = trained.predict(tensor).item()
 
             # Draw prediction
             cv2.putText(frame, f"Prediction: {pred}", (30, 50),
@@ -86,7 +73,7 @@ def main():
                # cv2.imshow("Gray", )
             print(f"Prediction: {pred}")
 
-            if cv2.waitKey(1) & 0xFF == 27:  # ESC key
+            if cv2.waitKey(1) & 0xFF == QUIT_KEY:
                 break
 
     finally:
