@@ -39,13 +39,14 @@ Class order comes from the sorted folder names. `Test_Data/` uses the same layou
 | Collect labelled images (press `0`-`9` to save, `q` to quit) | `python collect.py` / `collect_windows.py` |
 | Run unit tests | `pytest tests` |
 
-Settings (`DATA_DIR`, `BATCH_SIZE`, `MODEL_PATH`, `EVAL_DIR`, ...) are constants at the top of each script. Press `Esc` to quit the camera windows.
+All configuration lives in `settings.py`: paths, model architecture (`ARCH`, default `ASLNet`), checkpoint path, training hyperparameters, preprocessing, and camera settings. Edit it instead of the scripts. Press `Esc` to quit the camera windows.
 
 ## How it works
 
 - **`visionPreprocess.py`**: `crop_hand(img, method)` returns the hand crop as a model-ready tensor plus its bounding box, or `None` if no hand is found. `method="yolo"` uses a YOLOv8 detector (used for training); `method="skin"` uses an HSV skin mask (no extra weights).
 - **`dataset.py`**: `PreprocessedImageDataset` loads class folders and applies `crop_hand`.
-- **`models/`**: `SimpleCNN` (default), `ASLNet` (deeper, with BatchNorm and dropout), plus `SVM` and `random_forest` experiments.
+- **`settings.py`**: central constants (no heavy imports).
+- **`models/`**: `ASLNet` (default; BatchNorm and dropout), `SimpleCNN` (smaller), plus `SVM` and `random_forest` experiments.
 - **`training.py`**: generic `train` / `evaluate` loops for any `nn.Module`.
 - **`trained_model.py`**: `save` / `load` checkpoints with their architecture, class names and preprocessing method, so scripts don't hardcode them. Old bare `state_dict` files still load if you pass `arch` and `num_classes`.
 
@@ -53,4 +54,4 @@ Settings (`DATA_DIR`, `BATCH_SIZE`, `MODEL_PATH`, `EVAL_DIR`, ...) are constants
 
 - `yolov8n.pt` is downloaded automatically on first use.
 - The camera scripts use a Jetson GStreamer pipeline; use the `_windows` variants on other machines.
-- Camera scripts load the checkpoint named in their `MODEL_PATH` constant. Make sure it matches the file you trained.
+- `train.py`, `test.py` and the camera scripts all use `settings.MODEL_PATH` (`asl_net_model.pth`), so run `python train.py` first.

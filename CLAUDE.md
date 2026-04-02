@@ -4,42 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Sign-language hand-gesture classifier (course project, DataSci 3000). Images are cropped to the hand, converted to 128×128 grayscale, and classified by a small PyTorch CNN. There is no build system, linter, or test suite; everything is run as plain scripts from the repo root.
+Sign-language hand-gesture classifier (course project, DataSci 3000). Images are cropped to the hand, converted to 128×128 grayscale, and classified by a PyTorch CNN. There is no build system or linter; everything runs as plain scripts from the repo root.
 
 ## Setup and commands
 
 ```
 python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt   # test.py also needs matplotlib (not listed)
-python train.py                   # train + save weights + print (val loss, accuracy)
+pip install -r requirements.txt   # test.py also needs matplotlib; tests need pytest
+python train.py                   # train + save checkpoint + print (val loss, accuracy)
 python test.py                    # classification report / confusion matrix on Test_Data/
-python Camera.py                  # live webcam inference (Jetson CSI camera via GStreamer)
-python Camera_windows.py          # same, for a regular webcam on Windows
-python collect.py                 # capture preprocessed images from camera (collect_windows.py for Windows)
+python Camera.py                  # live inference, Jetson CSI camera via GStreamer
+python Camera_windows.py          # live inference, regular webcam
+python collect.py                 # capture labelled images (collect_windows.py for webcam)
+pytest tests                      # all tests
+pytest tests/test_hand_crop.py::test_name   # a single test
 ```
 
-`train.py` and `test.py` are configured by editing constants at the top of the file (`DATA_DIR`, `NUM_CLASSES`, `BATCH_SIZE`, `MODEL_PATH`, `EVAL_DIR`), not via CLI args.
+All configuration is in `settings.py` (paths, `ARCH`, `MODEL_PATH`, hyperparameters, preprocessing, camera). Scripts have no CLI args.
 
 ## Data (gitignored, must be built locally)
 
-- `archive/` is the Kaggle American Sign Language Digits dataset. `data/` must be built from it by hand: one subfolder per class (`0/`, `1/`, ...), images inside. Labels come from `sorted(os.listdir(root))` index, so folder names define class order.
-- `Test_Data/` (note: `.gitignore` says `Test_data/`) is the same layout, used by `test.py`.
-- `yolov8n.pt` is loaded by `dataset.py` at import time (`*.pt` is gitignored; ultralytics downloads it on first use).
+- `archive/` is the Kaggle American Sign Language Digits dataset. `data/` is built from it by hand: one subfolder per class (`0/`, `1/`, ...). Labels are the index in the sorted folder list, so folder names define class order (`settings.class_names()`).
+- `Test_Data/` uses the same layout (note `.gitignore` says `Test_data/`).
+- `yolov8n.pt` is downloaded by ultralytics on first use (`*.pt` is gitignored).
 
 ## Architecture
 
-- `visionPreprocess.py` is the shared preprocessing layer. Two paths exist:
-  - `preprocess_with_yolo(img, yolo)`: crops the highest-confidence YOLO box → grayscale → 128×128 → `cnn_transform` (normalize to [-1, 1]). Used for training/eval via `dataset.py`. Returns `None` if nothing is detected.
-  - `preprocess_live(img)`: HSV skin-mask + largest-contour square crop, no YOLO. Used by the camera/collection scripts.
-  - Training and live inference therefore use different crops; keep them in mind when debugging train/serve mismatch. `preprocess_live`'s return arity differs between callers (`dataset.py`'s commented code unpacks 3 values, `Camera.py` unpacks 2); check the function before relying on either.
-- `dataset.py`: `PreprocessedImageDataset` runs YOLO on every `__getitem__` (slow). Images with no detection fall through to the next index.
-- `training.py`: generic `train(model, loader, epochs, lr)` (Adam + CrossEntropy) and `evaluate(model, loader)` → `(loss, accuracy)`. It works with any `nn.Module` that maps `(B,1,128,128)` to logits.
-- `models/`: `model_CNN.SimpleCNN` (the active model), `complex_CNN.ASLNet`, `SVM.SVMClassifier` (linear + hinge loss as an `nn.Module`), `random_forest` (sklearn wrapper, not wired into `train.py`). New models go here and get swapped in inside `train.py`.
-- `train.py` splits 90/5/5 (train/val/test) randomly, trains `SimpleCNN`, and saves a `.pth` state dict to the repo root. Alternate models are left as commented-out blocks.
+- `settings.py`: single source of config. Keep it free of heavy imports.
+- `visionPreprocess.py`: `crop_hand(img, method="yolo"|"skin") -> HandCrop | None`. The YOLO adapter (used for training) takes the highest-confidence box; the skin adapter (HSV mask + CLAHE) needs no weights. Both return a `HandCrop` (tensor, bbox in original coordinates, display image) or `None` when nothing is found. YOLO loads lazily via `get_yolo()`; tests pass a stub through `yolo=`.
+- `dataset.py`: `PreprocessedImageDataset` applies `crop_hand` per item (slow) and falls through to the next sample on `None`.
+- `trained_model.py`: `save`/`load` checkpoints as a dict with arch, class names and preprocess method; `load` returns a `TrainedModel` with `.predict`. Bare legacy `state_dict` files load only if `arch` and `num_classes` are passed (`settings.LEGACY_*`). New architectures must be added to `ARCHITECTURES`.
+- `training.py`: generic `train` / `evaluate` for any `nn.Module` mapping `(B,1,128,128)` to logits.
+- `models/`: `ASLNet` (default), `SimpleCNN`, `SVMClassifier` (hinge loss `nn.Module`), `random_forest` (sklearn wrapper, not wired up; its `fit` is buggy).
+- `train.py` splits 90/5/5 randomly (the test split is unused), trains `settings.ARCH`, and saves to `settings.MODEL_PATH`.
 
 ## Gotchas
 
-- `NUM_CLASSES` is hardcoded separately in `train.py` (2), `test.py` (2), and `Camera.py` (10). They must match the checkpoint being loaded.
-- Checkpoint filenames are hardcoded and differ per script (`train.py` writes `simple_cnn_model_3.pth`; `test.py` loads `simple_cnn_model.pth`; `Camera.py` loads `cnn_model.pth` into `SimpleCNN`).
-- `Camera.py`/`collect.py` use a Jetson `nvarguscamerasrc` GStreamer pipeline; use the `_windows` variants elsewhere.
-- Committed `.pth` weights, the `.pptx` and the `.docx` are project deliverables, not code.
+- Training uses YOLO crops (`TRAIN_PREPROCESS_METHOD`) while `Camera.py` uses the skin adapter and `Camera_windows.py` uses YOLO. `preprocess_method` is saved in the checkpoint but nothing reads it yet. The stock COCO `yolov8n.pt` has no hand class, so crops may not be hands.
+- `train.py` derives `NUM_CLASSES` from the folders in `data/`, falling back to `LEGACY_NUM_CLASSES` if the folder is missing.
+- Committed `.pth` files are legacy bare state dicts; the `.pptx` and `.docx` are project deliverables, not code.
