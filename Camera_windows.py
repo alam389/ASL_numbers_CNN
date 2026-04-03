@@ -1,5 +1,6 @@
 import cv2
 import torch
+from device import pick_device
 import torchvision.transforms as transforms
 from models.model_CNN import SimpleCNN
 from models.complex_CNN import ASLNet
@@ -8,7 +9,7 @@ import trained_model
 
 from settings import MODEL_PATH, LEGACY_ARCH, LEGACY_NUM_CLASSES, ROI_SIZE, QUIT_KEY, WEBCAM_INDEX
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = pick_device()
 
 # Load Model
 trained = trained_model.load(MODEL_PATH, device=device, arch=LEGACY_ARCH, num_classes=LEGACY_NUM_CLASSES)

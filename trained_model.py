@@ -9,6 +9,8 @@ Deliberately imports only torch and models/ (no dataset, YOLO or train.py).
 """
 import torch
 
+from device import pick_device
+
 from models.complex_CNN import ASLNet
 from models.model_CNN import SimpleCNN
 
@@ -84,8 +86,7 @@ def load(path, device=None, arch=None, num_classes=None, class_names=None, prepr
     files, metadata comes from the file; explicit args are ignored except that a
     mismatching `arch` raises.
     """
-    device = torch.device(device) if device is not None else torch.device(
-        "cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(device) if device is not None else pick_device()
     ckpt = torch.load(path, map_location=device)
     if isinstance(ckpt, dict) and "state_dict" in ckpt and "arch" in ckpt:
         if arch is not None and arch != ckpt["arch"]:

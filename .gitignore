@@ -24,3 +24,5 @@ Thumbs.db
 *.pt
 
 *.MP4
+# Crop cache
+cache/

@@ -1,5 +1,6 @@
 import os
 import torch
+from device import pick_device
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -14,7 +15,7 @@ import trained_model
 
 from settings import MODEL_PATH, EVAL_DIR, EVAL_BATCH_SIZE, LEGACY_ARCH, LEGACY_NUM_CLASSES
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = pick_device()
 
 def load_model():
     return trained_model.load(MODEL_PATH, device=device, arch=LEGACY_ARCH, num_classes=LEGACY_NUM_CLASSES).model

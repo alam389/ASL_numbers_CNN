@@ -27,7 +27,7 @@ class StubYolo:
         self.boxes = _Boxes(xyxy, conf)
         self.calls = 0
 
-    def __call__(self, img):
+    def __call__(self, img, **kwargs):
         self.calls += 1
         return [self]
 

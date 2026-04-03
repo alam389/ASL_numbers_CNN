@@ -1,8 +1,9 @@
 import torch
+from device import pick_device
 import torch.nn as nn
 
 def train(model, dataloader, epochs=10, lr=1e-3):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = pick_device()
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -23,7 +24,7 @@ def train(model, dataloader, epochs=10, lr=1e-3):
 
 
 def evaluate(model, loader):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = pick_device()
     model = model.to(device)
     model.eval()
 

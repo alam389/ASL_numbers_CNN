@@ -4,6 +4,7 @@ import os
 # --- Paths ---
 DATA_DIR = "data"                          # training images, one subfolder per class
 EVAL_DIR = "Test_Data"                     # evaluation images, same layout
+CACHE_DIR = "cache"                        # preprocessed crop cache (gitignored)
 COLLECT_DIR = "my_dataset_processed"       # where collect*.py saves camera captures
 MODEL_PATH = "asl_net_model.pth"           # written by train.py, read by test.py and the camera scripts
 
@@ -28,10 +29,11 @@ TRAIN_PREPROCESS_METHOD = "yolo"           # "yolo" or "skin"; stored in the che
 SKIN_CROP_PADDING = 0.05                   # fraction of crop side added around the skin-mask box
 
 # --- Training ---
+DEVICE = "auto"                            # "auto" (cuda > mps > cpu), "cuda", "mps" or "cpu"
 BATCH_SIZE = 32
 EPOCHS = 10
 LEARNING_RATE = 1e-3
-NUM_WORKERS = 4
+NUM_WORKERS = 0                            # crops are cached in memory, workers only add overhead
 TRAIN_SPLIT = 0.9
 VAL_SPLIT = 0.05                           # remainder is the test split
 EVAL_BATCH_SIZE = 32

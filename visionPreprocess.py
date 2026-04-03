@@ -49,7 +49,7 @@ def get_yolo(weights=YOLO_WEIGHTS):
 def _crop_yolo(img, yolo=None):
     yolo = yolo if yolo is not None else get_yolo()
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    results = yolo(img_rgb)[0]
+    results = yolo(img_rgb, verbose=False)[0]
 
     if len(results.boxes) == 0:
         return None
