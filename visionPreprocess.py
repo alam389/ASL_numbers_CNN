@@ -7,7 +7,8 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 
-from settings import INPUT_SIZE, YOLO_WEIGHTS, SKIN_CROP_PADDING
+from settings import (INPUT_SIZE, YOLO_WEIGHTS, SKIN_CROP_PADDING, HAND_MODEL_PATH, HAND_MODEL_URL,
+                      HAND_CROP_PADDING, HAND_MIN_CONFIDENCE)
 
 cnn_transform = transforms.Compose([
     transforms.ToPILImage(),
@@ -23,7 +24,7 @@ class HandCrop:
     """Result of crop_hand().
 
     tensor: model-ready float32 torch tensor, shape (1, H, W). Scaling depends on method:
-            "yolo" -> normalized to [-1, 1] (cnn_transform); "skin" -> [0, 1].
+            "yolo" and "mediapipe" -> normalized to [-1, 1] (cnn_transform); "skin" -> [0, 1].
     bbox:   (x, y, w, h) of the crop in the ORIGINAL image's coordinates.
     image:  uint8 (H, W) view of the model input, for display / saving.
     debug:  optional uint8 grayscale of the crop before resizing (skin path only).
@@ -70,6 +71,57 @@ def _crop_yolo(img, yolo=None):
 
     image = np.clip((crop_tensor[0].numpy() * 0.5 + 0.5) * 255, 0, 255).astype(np.uint8)
     return HandCrop(crop_tensor, (int(x1), int(y1), int(x2 - x1), int(y2 - y1)), image)
+
+
+_hand_landmarker = None
+
+
+def get_hand_landmarker():
+    """Lazily load MediaPipe's hand landmarker, downloading the model file on first use."""
+    global _hand_landmarker
+    if _hand_landmarker is None:
+        if not os.path.isfile(HAND_MODEL_PATH):
+            import urllib.request
+            print(f"Downloading hand model to {HAND_MODEL_PATH} ...")
+            urllib.request.urlretrieve(HAND_MODEL_URL, HAND_MODEL_PATH)
+        from mediapipe.tasks import python as mp_python
+        from mediapipe.tasks.python import vision
+        options = vision.HandLandmarkerOptions(
+            base_options=mp_python.BaseOptions(model_asset_path=HAND_MODEL_PATH),
+            num_hands=1,
+            min_hand_detection_confidence=HAND_MIN_CONFIDENCE,
+        )
+        _hand_landmarker = vision.HandLandmarker.create_from_options(options)
+    return _hand_landmarker
+
+
+def _crop_mediapipe(img, landmarker=None):
+    """Square crop around the hand's landmarks (MediaPipe Hands)."""
+    import mediapipe as mp
+    landmarker = landmarker if landmarker is not None else get_hand_landmarker()
+    H, W = img.shape[:2]
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    result = landmarker.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
+    if not result.hand_landmarks:
+        return None
+
+    pts = result.hand_landmarks[0]
+    xs = [p.x * W for p in pts]
+    ys = [p.y * H for p in pts]
+    cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    side = max(max(xs) - min(xs), max(ys) - min(ys)) * (1 + 2 * HAND_CROP_PADDING)
+    x1, y1 = int(max(cx - side / 2, 0)), int(max(cy - side / 2, 0))
+    x2, y2 = int(min(cx + side / 2, W)), int(min(cy + side / 2, H))
+
+    crop = rgb[y1:y2, x1:x2]
+    if crop.size == 0:
+        return None
+
+    crop_gray = cv2.resize(cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY), INPUT_SIZE)
+    tensor = torch.tensor(crop_gray, dtype=torch.float32).unsqueeze(0) / 255.0
+    tensor = cnn_transform(tensor)
+    image = np.clip((tensor[0].numpy() * 0.5 + 0.5) * 255, 0, 255).astype(np.uint8)
+    return HandCrop(tensor, (x1, y1, x2 - x1, y2 - y1), image)
 
 
 def _crop_skin(img, size=INPUT_SIZE):
@@ -123,18 +175,21 @@ def _crop_skin(img, size=INPUT_SIZE):
                     (x1, y1, x2 - x1, y2 - y1), digit_u8, debug=gray)
 
 
-def crop_hand(img, method="yolo", yolo=None) -> Optional[HandCrop]:
+def crop_hand(img, method="yolo", yolo=None, landmarker=None) -> Optional[HandCrop]:
     """Find the hand in a BGR image and return a model-ready HandCrop, or None if not found.
 
-    method: "yolo" (highest-confidence YOLO box; used for training) or
+    method: "mediapipe" (MediaPipe hand landmarks; the default in settings),
+            "yolo" (highest-confidence box of the stock COCO model, which has no hand class) or
             "skin" (HSV skin mask + largest contour; no model needed).
-    yolo:   optional detector to use instead of the lazily loaded default (yolo only).
+    yolo / landmarker: optional detectors to use instead of the lazily loaded defaults.
     """
     if method == "yolo":
         return _crop_yolo(img, yolo)
+    if method == "mediapipe":
+        return _crop_mediapipe(img, landmarker)
     if method == "skin":
         return _crop_skin(img)
-    raise ValueError(f"unknown method {method!r}; expected 'yolo' or 'skin'")
+    raise ValueError(f"unknown method {method!r}; expected 'mediapipe', 'yolo' or 'skin'")
 
 
 # Process folder just used for testing

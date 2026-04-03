@@ -61,3 +61,12 @@ def test_unknown_arch_and_class_mismatch(tmp_path):
     trained_model.save(tmp_path / "ok.pth", model, num_classes=2)
     with pytest.raises(ValueError):
         trained_model.load(tmp_path / "ok.pth", device="cpu", arch="ASLNet")
+
+
+def test_legacy_fallbacks_do_not_constrain_new_checkpoints(tmp_path):
+    new, old = str(tmp_path / "new.pth"), str(tmp_path / "old.pth")
+    trained_model.save(new, ASLNet(num_classes=3), num_classes=3)
+    torch.save(SimpleCNN(num_classes=2).state_dict(), old)
+    kw = dict(legacy_arch="SimpleCNN", legacy_num_classes=2)
+    assert trained_model.load(new, **kw).arch == "ASLNet"
+    assert trained_model.load(old, **kw).arch == "SimpleCNN"

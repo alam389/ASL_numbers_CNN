@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from visionPreprocess import crop_hand
 
-from settings import COLLECT_DIR as DATA_DIR, WEBCAM_INDEX
+from settings import TRAIN_PREPROCESS_METHOD, COLLECT_DIR as DATA_DIR, WEBCAM_INDEX
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Create class folders 0–9
@@ -28,7 +28,7 @@ while True:
         break
 
     # Apply your preprocessing
-    crop = crop_hand(frame, method="skin")
+    crop = crop_hand(frame, method=TRAIN_PREPROCESS_METHOD)
     processed = crop.image if crop is not None else None
 
     # Show raw camera feed

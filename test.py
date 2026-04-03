@@ -18,7 +18,7 @@ from settings import MODEL_PATH, EVAL_DIR, EVAL_BATCH_SIZE, LEGACY_ARCH, LEGACY_
 device = pick_device()
 
 def load_model():
-    return trained_model.load(MODEL_PATH, device=device, arch=LEGACY_ARCH, num_classes=LEGACY_NUM_CLASSES).model
+    return trained_model.load(MODEL_PATH, device=device, legacy_arch=LEGACY_ARCH, legacy_num_classes=LEGACY_NUM_CLASSES).model
 
 def get_dataloader():
     dataset = PreprocessedImageDataset(EVAL_DIR)

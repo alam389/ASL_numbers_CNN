@@ -7,13 +7,15 @@ from models.complex_CNN import ASLNet
 from visionPreprocess import crop_hand
 import trained_model
 
-from settings import MODEL_PATH, LEGACY_ARCH, LEGACY_NUM_CLASSES, ROI_SIZE, QUIT_KEY, JETSON_CAMERA
+from settings import MODEL_PATH, LEGACY_ARCH, LEGACY_NUM_CLASSES, QUIT_KEY, JETSON_CAMERA, TRAIN_PREPROCESS_METHOD
 
 device = pick_device()
 
 #Load Model
 # LEGACY_* are only used if MODEL_PATH is a legacy bare state_dict
-trained = trained_model.load(MODEL_PATH, device=device, arch=LEGACY_ARCH, num_classes=LEGACY_NUM_CLASSES)
+trained = trained_model.load(MODEL_PATH, device=device, legacy_arch=LEGACY_ARCH, legacy_num_classes=LEGACY_NUM_CLASSES)
+# Crop the same way the model was trained (stored in the checkpoint)
+METHOD = trained.preprocess_method or TRAIN_PREPROCESS_METHOD
 
 def gstreamer_pipeline(
     sensor_id=0,
@@ -72,7 +74,7 @@ def main():
             roi = frame[y1:y2, x1:x2]
             
             #processed, bbox = preprocess_live(roi)
-            crop = crop_hand(frame, method="skin")
+            crop = crop_hand(frame, method=METHOD)
             if crop is None:
                 cv2.imshow("Camera", frame)
                 if cv2.waitKey(1) & 0xFF == QUIT_KEY:

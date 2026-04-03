@@ -5,3 +5,6 @@ ultralytics
 numpy
 scikit-learn
 seaborn
+mediapipe
+matplotlib
+pytest

@@ -79,12 +79,14 @@ class TrainedModel:
         return [self.class_names[i] for i in self.predict(batch).tolist()]
 
 
-def load(path, device=None, arch=None, num_classes=None, class_names=None, preprocess_method=None):
+def load(path, device=None, arch=None, num_classes=None, class_names=None, preprocess_method=None,
+         legacy_arch=None, legacy_num_classes=None):
     """Load a checkpoint saved by `save`, or a legacy bare state_dict.
 
     For legacy files `arch` and `num_classes`/`class_names` are required. For new
     files, metadata comes from the file; explicit args are ignored except that a
-    mismatching `arch` raises.
+    mismatching `arch` raises. `legacy_arch`/`legacy_num_classes` are fallbacks used only
+    for legacy files, so callers can pass them without constraining new checkpoints.
     """
     device = torch.device(device) if device is not None else pick_device()
     ckpt = torch.load(path, map_location=device)
@@ -96,6 +98,9 @@ def load(path, device=None, arch=None, num_classes=None, class_names=None, prepr
         preprocess_method = ckpt.get("preprocess_method")
         state = ckpt["state_dict"]
     else:  # legacy bare state_dict
+        arch = arch if arch is not None else legacy_arch
+        if num_classes is None and class_names is None:
+            num_classes = legacy_num_classes
         if arch is None or (num_classes is None and class_names is None):
             raise ValueError(f"{path} is a legacy state_dict; pass arch and num_classes/class_names")
         classes = _resolve_classes(class_names, num_classes)

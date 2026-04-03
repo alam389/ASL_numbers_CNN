@@ -90,3 +90,37 @@ def test_unknown_method_raises():
 
 def test_import_does_not_load_yolo_weights():
     assert visionPreprocess._yolo_model is None
+
+
+class _Pt:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+
+class StubLandmarker:
+    def __init__(self, pts=None):
+        self.pts = pts
+
+    def detect(self, image):
+        class R:
+            pass
+        r = R()
+        r.hand_landmarks = [self.pts] if self.pts else []
+        return r
+
+
+def test_mediapipe_crop_uses_landmarks():
+    pytest.importorskip("mediapipe")
+    img = np.full((200, 300, 3), 90, np.uint8)
+    pts = [_Pt(0.4, 0.3), _Pt(0.6, 0.7)]
+    crop = crop_hand(img, "mediapipe", landmarker=StubLandmarker(pts))
+    assert crop.tensor.shape == (1, 128, 128)
+    assert -1.0 <= float(crop.tensor.min()) and float(crop.tensor.max()) <= 1.0
+    x, y, w, h = crop.bbox
+    assert 0 <= x < 300 and 0 <= y < 200 and w > 0 and h > 0
+    assert x <= 0.4 * 300 and x + w >= 0.6 * 300  # box covers the landmarks
+
+
+def test_mediapipe_no_hand_returns_none():
+    pytest.importorskip("mediapipe")
+    assert crop_hand(np.zeros((50, 50, 3), np.uint8), "mediapipe", landmarker=StubLandmarker()) is None

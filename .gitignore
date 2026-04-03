@@ -26,3 +26,6 @@ Thumbs.db
 *.MP4
 # Crop cache
 cache/
+
+# MediaPipe model (downloaded on first use)
+hand_landmarker.task
