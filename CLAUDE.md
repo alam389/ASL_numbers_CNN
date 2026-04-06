@@ -24,22 +24,25 @@ All configuration is in `settings.py` (paths, `ARCH`, `MODEL_PATH`, hyperparamet
 
 ## Data (gitignored, must be built locally)
 
-- `archive/` is the Kaggle American Sign Language Digits dataset. `data/` is built from it by hand: one subfolder per class (`0/`, `1/`, ...). Labels are the index in the sorted folder list, so folder names define class order (`settings.class_names()`).
-- `Test_Data/` uses the same layout (note `.gitignore` says `Test_data/`).
-- `yolov8n.pt` is downloaded by ultralytics on first use (`*.pt` is gitignored).
+- Dataset is **ASL-HG** (Mendeley, CC BY 4.0): download `ASL_Raw_Images.zip` and run `python prepare_hg.py <zip> --replace`. It writes `data/0..9,A..Z/` (36 classes; `--digits-only` for 0-9) and holds out 15% in `Test_Data/` (same layout). The script skips the "processed" images. Labels are the index in the sorted folder list (`settings.class_names()`).
+- `cache/<folder>_<method>.pt` holds cropped tensors, rebuilt automatically when files, crop method or input size change. Delete it if you change crop code.
+- `hand_landmarker.task` (MediaPipe) downloads on first use; `*.pt` and `*.task` are gitignored.
 
 ## Architecture
 
 - `settings.py`: single source of config. Keep it free of heavy imports.
-- `visionPreprocess.py`: `crop_hand(img, method="yolo"|"skin") -> HandCrop | None`. The YOLO adapter (used for training) takes the highest-confidence box; the skin adapter (HSV mask + CLAHE) needs no weights. Both return a `HandCrop` (tensor, bbox in original coordinates, display image) or `None` when nothing is found. YOLO loads lazily via `get_yolo()`; tests pass a stub through `yolo=`.
-- `dataset.py`: `PreprocessedImageDataset` applies `crop_hand` per item (slow) and falls through to the next sample on `None`.
-- `trained_model.py`: `save`/`load` checkpoints as a dict with arch, class names and preprocess method; `load` returns a `TrainedModel` with `.predict`. Bare legacy `state_dict` files load only if `arch` and `num_classes` are passed (`settings.LEGACY_*`). New architectures must be added to `ARCHITECTURES`.
+- `visionPreprocess.py`: `crop_hand(img, method="mediapipe"|"yolo"|"skin") -> HandCrop | None`. MediaPipe (default) squares a padded box around the hand landmarks; YOLO takes the best box of the stock COCO model (no hand class, so it boxes "person"); skin uses an HSV mask. Each returns a `HandCrop` (tensor, bbox in original coordinates, display image) or `None`. Detectors load lazily; tests inject stubs via `yolo=` / `landmarker=`.
+- `dataset.py`: `PreprocessedImageDataset` crops every image once (dropping images with no hand) and serves cached tensors.
+- `augment.py`: `HandAugment` for training only (affine + brightness; optional background swap, which only makes sense for black-background data, see `settings.BACKGROUND_SWAP_PROB`).
+- `device.py`: `pick_device()` honours `settings.DEVICE` (auto: cuda > mps > cpu).
+- `trained_model.py`: `save`/`load` checkpoints as a dict with arch, class names and preprocess method; `load` returns a `TrainedModel` (`.predict`, `.logits`). Bare legacy `state_dict` files load only with `legacy_arch` / `legacy_num_classes`. New architectures must be added to `ARCHITECTURES`.
 - `training.py`: generic `train` / `evaluate` for any `nn.Module` mapping `(B,1,128,128)` to logits.
-- `models/`: `ASLNet` (default), `SimpleCNN`, `SVMClassifier` (hinge loss `nn.Module`), `random_forest` (sklearn wrapper, not wired up; its `fit` is buggy).
-- `train.py` splits 90/5/5 randomly (the test split is unused), trains `settings.ARCH`, and saves to `settings.MODEL_PATH`.
+- `models/`: `ASLNet` (default), `SimpleCNN`, `SVMClassifier`, `random_forest` (sklearn wrapper, not wired up; its `fit` is buggy).
+- `train.py` splits train/val/test 90/5/5 randomly (the test split is unused; `Test_Data/` is the real held-out set), trains `settings.ARCH`, and saves to `settings.MODEL_PATH`.
 
 ## Gotchas
 
-- Training uses YOLO crops (`TRAIN_PREPROCESS_METHOD`) while `Camera.py` uses the skin adapter and `Camera_windows.py` uses YOLO. `preprocess_method` is saved in the checkpoint but nothing reads it yet. The stock COCO `yolov8n.pt` has no hand class, so crops may not be hands.
-- `train.py` derives `NUM_CLASSES` from the folders in `data/`, falling back to `LEGACY_NUM_CLASSES` if the folder is missing.
-- Committed `.pth` files are legacy bare state dicts; the `.pptx` and `.docx` are project deliverables, not code.
+- Camera scripts read the crop method from the checkpoint (`preprocess_method`), so retrain after changing `TRAIN_PREPROCESS_METHOD`. `Camera_windows.py` mirrors only the preview (`FLIP_DISPLAY`); the model sees the unflipped frame.
+- `NUM_CLASSES` comes from the folders in `data/` (fallback `LEGACY_NUM_CLASSES`). Class "0" in ASL-HG is the two-handed sign.
+- Models trained on clean datasets fail on webcam backgrounds; validation accuracy on the train distribution says little about live performance. Evaluate with `test.py` on `Test_Data/` and on your own captures.
+- Committed `.pth` files other than `asl_net_model.pth` are legacy bare state dicts; the `.pptx` and `.docx` are project deliverables, not code.

@@ -31,6 +31,9 @@ def test_round_trip(tmp_path, cls):
         expected = torch.argmax(model(x), dim=1)
     assert torch.equal(loaded.predict(x), expected)
     assert loaded.predict_names(x) == [["a", "b", "c", "d"][i] for i in expected.tolist()]
+    names_conf = loaded.predict_with_confidence(x)
+    assert [n for n, _ in names_conf] == loaded.predict_names(x)
+    assert all(0.0 < c <= 1.0 for _, c in names_conf)
 
 
 def test_legacy_state_dict(tmp_path):

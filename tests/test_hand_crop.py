@@ -124,3 +124,16 @@ def test_mediapipe_crop_uses_landmarks():
 def test_mediapipe_no_hand_returns_none():
     pytest.importorskip("mediapipe")
     assert crop_hand(np.zeros((50, 50, 3), np.uint8), "mediapipe", landmarker=StubLandmarker()) is None
+
+
+def test_mediapipe_crop_at_frame_edge_is_padded_not_stretched():
+    pytest.importorskip("mediapipe")
+    img = np.zeros((200, 300, 3), np.uint8)
+    cv2.circle(img, (150, 170), 20, (255, 255, 255), -1)
+    pts = [_Pt(105 / 300, 0.7), _Pt(195 / 300, 1.15)]   # hand box runs past the bottom edge
+    crop = crop_hand(img, "mediapipe", landmarker=StubLandmarker(pts))
+    bright = crop.tensor[0] > 0
+    rows, cols = bright.any(dim=1).sum().item(), bright.any(dim=0).sum().item()
+    assert abs(rows - cols) <= 2                          # circle stays round
+    x, y, w, h = crop.bbox
+    assert y + h <= 200 and x + w <= 300                  # drawn box stays inside the frame

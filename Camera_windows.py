@@ -47,7 +47,7 @@ def main():
             bbox = crop.bbox
             hand_region = crop.image
 
-            pred = trained.predict(tensor).item()
+            pred, conf = trained.predict_with_confidence(tensor)[0]
 
             # Draw the detected hand box
             if bbox is not None:
@@ -56,14 +56,14 @@ def main():
 
             # Mirror only what's shown; the model sees the unflipped frame (as in the dataset)
             display = cv2.flip(frame, 1) if FLIP_DISPLAY else frame
-            cv2.putText(display, f"Prediction: {pred}", (30, 50),
+            cv2.putText(display, f"Prediction: {pred} ({conf:.0%})", (30, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.imshow("Camera", display)
             #cv2.imshow("Live", live)
             if hand_region is not None:
                 cv2.imshow("Hand_region", hand_region)
                # cv2.imshow("Gray", )
-            print(f"Prediction: {pred}")
+            print(f"Prediction: {pred} ({conf:.0%})")
 
             if cv2.waitKey(1) & 0xFF == QUIT_KEY:
                 break

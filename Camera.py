@@ -84,7 +84,7 @@ def main():
 
             tensor = crop.tensor.float().unsqueeze(0).to(device)
  
-            pred = trained.predict(tensor).item()
+            pred = trained.predict_names(tensor)[0]
 
             cv2.putText(frame, f"Prediction: {pred}", (30, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)

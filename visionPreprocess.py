@@ -110,12 +110,16 @@ def _crop_mediapipe(img, landmarker=None):
     ys = [p.y * H for p in pts]
     cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
     side = max(max(xs) - min(xs), max(ys) - min(ys)) * (1 + 2 * HAND_CROP_PADDING)
-    x1, y1 = int(max(cx - side / 2, 0)), int(max(cy - side / 2, 0))
-    x2, y2 = int(min(cx + side / 2, W)), int(min(cy + side / 2, H))
-
-    crop = rgb[y1:y2, x1:x2]
+    x1, y1 = int(cx - side / 2), int(cy - side / 2)
+    x2, y2 = x1 + int(side), y1 + int(side)
+    # Pad (edge pixels) where the square leaves the frame, so the crop is never stretched
+    pad = [max(-y1, 0), max(y2 - H, 0), max(-x1, 0), max(x2 - W, 0)]
+    if max(pad) > 0:
+        rgb = cv2.copyMakeBorder(rgb, *pad, cv2.BORDER_REPLICATE)
+    crop = rgb[y1 + pad[0]:y2 + pad[0], x1 + pad[2]:x2 + pad[2]]
     if crop.size == 0:
         return None
+    x1, y1, x2, y2 = max(x1, 0), max(y1, 0), min(x2, W), min(y2, H)   # visible part, for drawing
 
     crop_gray = cv2.resize(cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY), INPUT_SIZE)
     tensor = torch.tensor(crop_gray, dtype=torch.float32).unsqueeze(0) / 255.0

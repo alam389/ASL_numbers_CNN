@@ -78,6 +78,11 @@ class TrainedModel:
     def predict_names(self, batch):
         return [self.class_names[i] for i in self.predict(batch).tolist()]
 
+    def predict_with_confidence(self, batch):
+        """[(class_name, softmax probability)] for the top class of each item."""
+        conf, idx = torch.softmax(self.logits(batch), dim=1).max(dim=1)
+        return [(self.class_names[i], c) for i, c in zip(idx.tolist(), conf.tolist())]
+
 
 def load(path, device=None, arch=None, num_classes=None, class_names=None, preprocess_method=None,
          legacy_arch=None, legacy_num_classes=None):
