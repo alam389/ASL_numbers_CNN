@@ -1,6 +1,5 @@
-import torch
-import torchvision.transforms as T
 from torch.utils.data import DataLoader, Dataset, random_split
+from augment import HandAugment
 from dataset import PreprocessedImageDataset
 from training import train, evaluate
 import trained_model
@@ -14,20 +13,18 @@ CLASS_NAMES = settings.class_names(DATA_DIR)
 NUM_CLASSES = len(CLASS_NAMES) or settings.LEGACY_NUM_CLASSES
 
 class Augmented(Dataset):
-    """Random shift/rotate/scale plus brightness/contrast on tensors in [-1, 1] (training only)."""
+    """Applies HandAugment to a training subset (validation stays untouched)."""
 
     def __init__(self, subset):
         self.subset = subset
-        self.affine = T.RandomAffine(degrees=12, translate=(0.1, 0.1), scale=(0.85, 1.15), fill=-1.0)
+        self.augment = HandAugment(p_background=settings.BACKGROUND_SWAP_PROB)
 
     def __len__(self):
         return len(self.subset)
 
     def __getitem__(self, idx):
         x, y = self.subset[idx]
-        x = self.affine(x)
-        x = (x * (0.8 + 0.4 * torch.rand(1)) + (torch.rand(1) - 0.5) * 0.4).clamp(-1, 1)
-        return x, y
+        return self.augment(x), y
 
 
 def main():

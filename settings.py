@@ -23,6 +23,7 @@ def class_names(data_dir=DATA_DIR):
 
 
 # --- Preprocessing ---
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg")
 INPUT_SIZE = (128, 128)                    # model input (H, W)
 YOLO_WEIGHTS = "yolov8n.pt"
 TRAIN_PREPROCESS_METHOD = "mediapipe"      # "mediapipe", "yolo" or "skin"; stored in the checkpoint
@@ -35,12 +36,13 @@ SKIN_CROP_PADDING = 0.05                   # fraction of crop side added around 
 # --- Training ---
 DEVICE = "auto"                            # "auto" (cuda > mps > cpu), "cuda", "mps" or "cpu"
 BATCH_SIZE = 32
-EPOCHS = 10
+EPOCHS = 20
 LEARNING_RATE = 1e-3
 NUM_WORKERS = 0                            # crops are cached in memory, workers only add overhead
 TRAIN_SPLIT = 0.9
 VAL_SPLIT = 0.05                           # remainder is the test split
 EVAL_BATCH_SIZE = 32
+BACKGROUND_SWAP_PROB = 0.0                 # chance to paste hands onto random backgrounds; only for black-background data (e.g. 0.85)
 AUGMENT = True                             # random shift/rotate/scale/brightness on training batches only
 
 # --- Camera ---

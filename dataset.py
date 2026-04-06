@@ -15,7 +15,7 @@ def _list_samples(root_dir):
         if not os.path.isdir(class_path):
             continue
         for fname in sorted(os.listdir(class_path)):
-            if fname.lower().endswith((".png", ".jpg", ".jpeg")):
+            if fname.lower().endswith(settings.IMAGE_EXTENSIONS):
                 samples.append((os.path.join(class_path, fname), label))
     return samples
 

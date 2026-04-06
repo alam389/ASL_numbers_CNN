@@ -29,3 +29,6 @@ cache/
 
 # MediaPipe model (downloaded on first use)
 hand_landmarker.task
+
+# Training logs
+*.log
